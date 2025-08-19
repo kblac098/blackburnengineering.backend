@@ -13,7 +13,8 @@ public class WebConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/api/**")
-                        .allowedOrigins("https://www.blackburnengineering.site","https://blackburnengineering.site","http://localhost:443") // React dev server URL
+                        .allowedOrigins("http://localhost:400") // React development server URL
+                        //.allowedOrigins("https://www.blackburnengineering.site","https://blackburnengineering.site","http://localhost:443") // React production server URL
                         .allowedMethods("GET");
             }
         };
