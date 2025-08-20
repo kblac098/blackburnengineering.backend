@@ -7,6 +7,7 @@ import java.util.Properties;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -27,13 +28,13 @@ public class EmailService {
     int day;
     String month;
     int year;
-    String logArchivePath = "C:/Users/black/Documents/PROJECTS/Active/Blackburn Engineering/nginx/logs/archives";
+    String logArchivePath = "C:/nginx/logs/archives";
 
     // 5:30 AM every day (server local time)
-    @Scheduled(cron = "0 21 18 * * *")
+    @Scheduled(cron = "0 27 5 * * *")
     public void sendDailyEmail() {
         final String username = "kobe.blackburn2@gmail.com";
-        final String appPassword = "nyyl zpwh bpnu kwrs"; // Gmail app password
+        final String appPassword = ""; // Gmail app password
 
         Properties props = new Properties();
         props.put("mail.smtp.auth", "true");
@@ -55,7 +56,7 @@ public class EmailService {
                     Message.RecipientType.TO,
                     InternetAddress.parse("blackburn.kobej@gmail.com")
             );
-            message.setFrom(new InternetAddress(username));
+            message.setFrom(new InternetAddress(username, "Blackburn Engineering"));
             message.setSubject("Automated: BlackburnEngineering Daily Site Logs");
 
             // Body part - plain text
@@ -63,8 +64,7 @@ public class EmailService {
 
             LocalDate currentDate = LocalDate.now();
             
-            //day = currentDate.getDayOfMonth() - 1;
-            day = 14;
+            day = currentDate.getDayOfMonth() - 1;
             Month month_enum = currentDate.getMonth();
             String month_low = (month_enum.toString()).toLowerCase();
             month = Character.toUpperCase(month_low.charAt(0)) + month_low.substring(1);
@@ -73,11 +73,11 @@ public class EmailService {
             String mostservedip = getMostServedIp().getKey(); // calls cleanLogs
             int mostservedrequests = getMostServedIp().getValue();
 
-            //IpLocationResponse response = (new IpLocationService()).getLocation(mostservedip);
-            String country =        "na";               //response.country_name;
-            String region =         "na";               //response.region_name;
-            String city =           "na";               //response.city_name;
-            String organization =   "na";               //response.as;
+            IpLocationResponse response = (new IpLocationService()).getLocation(mostservedip);
+            String country = response.country_name;
+            String region = response.region_name;
+            String city = response.city_name;
+            String organization = response.as;
             String location = city+", "+region+", "+country+" and it is affiliated with "+organization;
             
             textPart.setText("Hello,\n\nAttached are the access and error logs for blackburnengineering.site for "+month+" "+day+", "
@@ -86,10 +86,10 @@ public class EmailService {
 
             // Attachment part
             MimeBodyPart attachmentPart1 = new MimeBodyPart();
-            attachmentPart1.attachFile("C:/Users/black/Documents/PROJECTS/Active/Blackburn Engineering/nginx/logs/archives/"+year+"/"+month+"/access_"+month+"_"+day+".log");  // <- path to the file you want to append
+            attachmentPart1.attachFile("C:/nginx/logs/archives/"+year+"/"+month+"/access_"+month+"_"+day+".log"); 
             
             MimeBodyPart attachmentPart2 = new MimeBodyPart();
-            attachmentPart2.attachFile("C:/Users/black/Documents/PROJECTS/Active/Blackburn Engineering/nginx/logs/archives/" + year + "/" + month + "/error_" + month + "_" + day + ".log");  // <- path to the file you want to append
+            attachmentPart2.attachFile("C:/nginx/logs/archives/" + year + "/" + month + "/error_" + month + "_" + day + ".log"); 
 
             // Combine body + attachment
             Multipart multipart = new MimeMultipart();
@@ -128,12 +128,12 @@ public class EmailService {
         }
     }
     private void cleanAccessLogs() {
-        Path accessLog = Paths.get("C:/Users/black/Documents/PROJECTS/Active/Blackburn Engineering/nginx/logs/access.log");
-        Path dayLog = Paths.get("C:/Users/black/Documents/PROJECTS/Active/Blackburn Engineering/nginx/logs/archives/"+year+"/"+month+"/access_"+month+"_"+day+".log");
+        Path accessLog = Paths.get("C:/nginx/logs/access.log");
+        Path dayLog = Paths.get("C:/nginx/logs/archives/"+year+"/"+month+"/access_"+month+"_"+day+".log");
         // Date pattern in logs: dd/MMM/yyyy
         String datePrefix = String.format("%02d/%s/%d", day, month.substring(0,3), year);
 
-        try (BufferedReader reader = Files.newBufferedReader(accessLog);
+        try (BufferedReader reader = Files.newBufferedReader(accessLog, StandardCharsets.ISO_8859_1);
              BufferedWriter writer = Files.newBufferedWriter(dayLog, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 
             String line;
@@ -157,14 +157,14 @@ public class EmailService {
         }
     }
     private void cleanErrorLogs() {
-        Path errorLog = Paths.get("C:/Users/black/Documents/PROJECTS/Active/Blackburn Engineering/nginx/logs/error.log");
-        Path dayLog = Paths.get("C:/Users/black/Documents/PROJECTS/Active/Blackburn Engineering/nginx/logs/archives/" + year + "/" + month + "/error_" + month + "_" + day + ".log");
+        Path errorLog = Paths.get("C:/nginx/logs/error.log");
+        Path dayLog = Paths.get("C:/nginx/logs/archives/" + year + "/" + month + "/error_" + month + "_" + day + ".log");
 
         // Date pattern in logs: yyyy/MM/dd
         String monthPadded = String.format("%02d", java.time.Month.valueOf(month.toUpperCase()).getValue());
         String datePrefix = String.format("%d/%s/%02d", year, monthPadded, day); // e.g., "2025/08/14"
 
-        try (BufferedReader reader = Files.newBufferedReader(errorLog);
+        try (BufferedReader reader = Files.newBufferedReader(errorLog, StandardCharsets.ISO_8859_1);
              BufferedWriter writer = Files.newBufferedWriter(dayLog, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 
             String line;
@@ -189,20 +189,25 @@ public class EmailService {
         createArchive();
         cleanAccessLogs();
         cleanErrorLogs();
+        if (day == 1) {
+            try {
+                Files.newBufferedWriter(Paths.get("C:/nginx/logs/access.log"), StandardOpenOption.TRUNCATE_EXISTING).close();
+                Files.newBufferedWriter(Paths.get("C:/nginx/logs/error.log"), StandardOpenOption.TRUNCATE_EXISTING).close();
+                System.out.println("Logs cleared for the new month.");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
     private Map.Entry<String, Integer> getMostServedIp() {
         cleanLogs();
-        //Path dayLog = Paths.get("\"C:/Users/black/Documents/PROJECTS/Active/Blackburn Engineering/nginx/logs/archives/"+year+"/"+month+"/access_"+month+"_"+day+".log");
-        //return "137.122.66.69";
-            Path dayLog = Paths.get("C:/Users/black/Documents/PROJECTS/Active/Blackburn Engineering/nginx/logs/archives/"
-            + year + "/" + month + "/access_" + month + "_" + day + ".log");
+        Path dayLog = Paths.get("C:/nginx/logs/archives/" + year + "/" + month + "/access_" + month + "_" + day + ".log");
 
         Map<String, Integer> ipCount = new HashMap<>();
 
         try (BufferedReader reader = Files.newBufferedReader(dayLog)) {
             String line;
             while ((line = reader.readLine()) != null) {
-                // Access log format: "127.0.0.1 - - [date] "GET ..."
                 String[] parts = line.split(" ");
                 if (parts.length > 0) {
                     String ip = parts[0];
